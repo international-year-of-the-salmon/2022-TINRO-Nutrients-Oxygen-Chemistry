@@ -1,0 +1,41 @@
+---
+title: "standardize nutrient data for erddap"
+author: "Brett Johnson"
+date: '2022-05-30'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(here)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+
+download.file("https://github.com/international-year-of-the-salmon/2022-TINRO-Data-Template/blob/main/IYS2022_TINRO.xlsx?raw=true", here("IYS_data_template", "IYS2022_TINRO.xlsx"))
+
+event <- read_excel(here("IYS_data_template", "IYS2022_TINRO.xlsx"), 
+    sheet = "4. SAMPLING EVENT INFO") %>% 
+  filter(Event_Type == "Rosette") %>% 
+  mutate(Time_Start = str_sub(Time_Start, -8, -1), # Remove leading date
+         Time_End = str_sub(Time_End, -8, -1),
+         Date_Time = paste0(format_ISO8601(as.POSIXct(paste0(as_date(
+           paste0(Year, "-", Month, "-", Day)), " ", Time_Start), tz="UTC")), "Z"),
+        # convert numeric fractional of day to minutes
+         Sampling_Duration_Minutes = round(Sampling_Duration_Minutes * 1440, 0)) %>%
+  select(-Day_Night, -Tow_speed_kilometers_per_hour, -Tow_distance_nautical_miles, -Swell_height_Meters, -Weather_description, -Comments) 
+
+
+# Seems like there is an issue with joining. Maybe  I messed up renaming the Station Event ID
+nuts <- read_excel(here("IYS_data_template", "IYS2022_TINRO.xlsx"), 
+    sheet = "8. ROSETTE INFO") %>% 
+  select(-c(sea_water_pH, sea_water_BOD5,sea_water_dissolved_inorganic_nitrogen, -Comments)) 
+
+join_nuts <- right_join(event, nuts, by = c("Station_Event_ID"))
+
+
+```
+
